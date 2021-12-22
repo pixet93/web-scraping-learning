@@ -7,7 +7,7 @@ SENSOR_AREA_PITCH_RE = r'[0-9]+\.[0-9]+ mm x [0-9]+\.[0-9]+ mm ' \
                        r'\([0-9]+\.[0-9]+ in x [0-9]+\.[0-9]+ in\)'
 
 REGEX = r'(?P<res_dim>[0-9]+ x [0-9]+)?(\s+)' \
-        r'(?P<res_name>[a-z-A-Z0-9\.]+ ?[a-z-A-Z0-9\.]+)?(\s+)' \
+        r'?(?P<res_name>[a-z-A-Z0-9\.]+ ?[a-z-A-Z0-9\.]+)?(\s+)' \
         r'(?P<mm>[a-z-A-Z0-9\.]+ mm x [a-z-A-Z0-9\.]+ mm) ' \
         r'(?P<inches>\([a-z-A-Z0-9\.]+ in x [a-z-A-Z0-9\.]+ in\))'
 
@@ -38,23 +38,35 @@ cam_data = OrderedDict()
 
 for camera_type in camera_links.keys():
     camera_types = camera_links[camera_type]['camera_types']
-    for cam, url in camera_types.items()[1:2]:
+    for cam, url in camera_types.items()[0:2]:
         page = requests.get(url)
         next_soup = BeautifulSoup(page.content, 'html.parser')
         results = next_soup.find('div', attrs={'class': 'entry-content'})
         sensor_dimensions_paragraph = next(p for p in results.find_all('p')
                                            if 'sensor dimensions' in p.text.lower())
-
-        sensor_dimensions = dict()
-        """lines = sensor_dimensions_paragraph.prettify().splitlines()
+        resolution_data = OrderedDict({'sensor_modes': OrderedDict(),
+                                       'resolutions': OrderedDict()})
+        lines = sensor_dimensions_paragraph.prettify().splitlines()
         for line in lines:
-            match = re.search(FILM_APERTURE_MM_RE, line)
+            match = re.search(SENSOR_AREA_PITCH_RE, line)
             if not match:
                 continue
-            sensor_dimensions.append(line)"""
-
-        if not sensor_dimensions:
-            sensor_modes = OrderedDict({'sensor_modes': OrderedDict()})
+            line = str(line.lstrip().replace(u'\xa0', ''))
+            match = re.search(SENSOR_AREA_PITCH_RE, line)
+            if not match:
+                continue
+            data = OrderedDict()
+            matches = re.search(REGEX, line).groupdict()
+            dimension = matches.get('res_dim')
+            res_name = matches.get('res_name')
+            data['resolution'] = '{0} - {1}'.format(dimension, res_name)
+            aperture_mm = matches.get('mm')
+            aperture_inches = matches.get('inches')
+            data['Aperture (mm)'] = aperture_mm
+            data['Aperture (Inches)'] = aperture_inches
+            data['Sensor Area Pitch'] = '{0} {1}'.format(aperture_mm, aperture_inches)
+            resolution_data['resolutions'][res_name] = data
+        else:
             for paragraph in results.find_all('p'):
                 emphasis_mode = paragraph.find('em', text=lambda text: 'mode' in text.lower())
                 if not emphasis_mode:
@@ -72,13 +84,10 @@ for camera_type in camera_links.keys():
                     res_name = matches.get('res_name')
                     data['resolution'] = '{0} - {1}'.format(dimension, res_name)
                     aperture_mm = matches.get('mm')
-                    aperture_inches = matches.get('in')
+                    aperture_inches = matches.get('inches')
                     data['Aperture (mm)'] = aperture_mm
                     data['Aperture (Inches)'] = aperture_inches
                     data['Sensor Area Pitch'] = '{0} {1}'.format(aperture_mm, aperture_inches)
+                    resolution_data['sensor_modes'][mode] = data
 
-                    sensor_modes['sensor_modes'][mode] = data
-
-            camera_links[camera_type]['camera_types'][cam] = sensor_modes
-
-            print camera_links
+        camera_links[camera_type]['camera_types'][cam] = resolution_data
