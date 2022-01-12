@@ -17,7 +17,7 @@ SENSOR_DIMENSION_RE = r'(?P<res_dim>[0-9]+ x [0-9]+)(\s+)' \
         r'(?P<inches>\([a-z-A-Z0-9\.]+ in x [a-z-A-Z0-9\.]+ in\))'
 sensor_dimension_regex = re.compile(SENSOR_DIMENSION_RE)
 
-_ALLOWED_CAM_MANUFACTURERS = ['arri', 'blackmagic', 'sony']
+_ALLOWED_CAM_MANUFACTURERS = ['Arri', 'Blackmagic', 'Sony']
 
 cam_db_url = 'https://vfxcamdb.com/'
 web_page = requests.get(cam_db_url)
@@ -35,7 +35,7 @@ camera_data = OrderedDict()
 for cam_manufacturer in _ALLOWED_CAM_MANUFACTURERS:
     # Find all hyperlink elements to get the urls for filtered camera types
     camera_links = camera_section_paragraph.find_all(
-        'a', string=lambda s: cam_manufacturer in s.lower())
+        'a', string=lambda s: cam_manufacturer.lower() in s.lower())
     camera_data[cam_manufacturer] = OrderedDict()
     for link in camera_links:
         camera_type = link.string
@@ -58,18 +58,18 @@ for cam_manufacturer in _ALLOWED_CAM_MANUFACTURERS:
         # Match a camera type that got multiple sensor resolutions
         matches = [m.groupdict() for m in sensor_dimension_regex.finditer(paragraph_string)]
         if matches:
-            resolution_data = OrderedDict()
+            resolution_data = OrderedDict({'Resolutions': OrderedDict()})
             for match in matches:
                 sensor_dimension_data = OrderedDict()
                 dimension = match.get('res_dim')
                 res_name = match.get('res_name')
-                sensor_dimension_data['resolution'] = '{0} - {1}'.format(dimension, res_name)
+                dimension_res = '{0} - {1}'.format(dimension, res_name)
                 aperture_mm = match.get('mm')
                 aperture_inches = match.get('inches')
                 sensor_dimension_data['Aperture (mm)'] = aperture_mm
                 sensor_dimension_data['Aperture (Inches)'] = aperture_inches
                 sensor_dimension_data['Sensor Area Pitch'] = '{0} {1}'.format(aperture_mm, aperture_inches)
-                resolution_data[res_name] = sensor_dimension_data
+                resolution_data['Resolutions'][dimension_res] = sensor_dimension_data
 
             camera_data[cam_manufacturer][camera_type] = resolution_data
         else:
@@ -85,7 +85,7 @@ for cam_manufacturer in _ALLOWED_CAM_MANUFACTURERS:
                 resolution_data['Sensor Area Pitch'] = '{0} {1}'.format(aperture_mm, aperture_inches)
                 camera_data[cam_manufacturer][camera_type] = resolution_data
             else:
-                resolution_data = OrderedDict({'sensors': OrderedDict()})
+                resolution_data = OrderedDict({'Sensors': OrderedDict()})
                 for paragraph in results.find_all('p'):
                     # Search for emphasis paragraph which contains sensor mode title
                     emphasis_mode = paragraph.find('em', text=lambda text: 'mode' in text.lower())
@@ -104,14 +104,14 @@ for cam_manufacturer in _ALLOWED_CAM_MANUFACTURERS:
                             sensor_dimension_data = OrderedDict()
                             dimension = match.get('res_dim')
                             res_name = match.get('res_name')
-                            sensor_dimension_data['resolution'] = '{0} - {1}'.format(dimension, res_name)
+                            dimension_res = '{0} - {1}'.format(dimension, res_name)
                             aperture_mm = match.get('mm')
                             aperture_inches = match.get('inches')
                             sensor_dimension_data['Aperture (mm)'] = aperture_mm
                             sensor_dimension_data['Aperture (Inches)'] = aperture_inches
                             sensor_dimension_data['Sensor Area Pitch'] = '{0} {1}'.format(aperture_mm, aperture_inches)
-                            resolutions[res_name] = sensor_dimension_data
-                            resolution_data['sensors'][sensor_mode] = resolutions
+                            resolutions[dimension_res] = sensor_dimension_data
+                            resolution_data['Sensors'][sensor_mode] = resolutions
 
                 camera_data[cam_manufacturer][camera_type] = resolution_data
 
