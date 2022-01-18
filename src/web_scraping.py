@@ -13,7 +13,6 @@
 # NOTE: Any attempts to use script inside network will not work.
 #==============================================================================
 """
-
 import requests
 import re
 import json
@@ -21,21 +20,18 @@ import json
 from collections import OrderedDict
 from bs4 import BeautifulSoup
 
-
 JSON_OUTPUT_PATH = "C:\\Users\\erik_\\Desktop\\camera_data.json"
 
 SENSOR_AREA_PITCH_RE = r'(?P<mm>[a-z-A-Z0-9\.]+ mm x [a-z-A-Z0-9\.]+ mm) ' \
                        r'(?P<inches>\([a-z-A-Z0-9\.]+ in x [a-z-A-Z0-9\.]+ in\))'
 sensor_area_regex = re.compile(SENSOR_AREA_PITCH_RE)
 
-SENSOR_DIMENSION_RE = r'(?P<res_dim>[0-9]+ x [0-9]+?([a-z-A-Z0-9\.:\s]+))(\s+)' \
+SENSOR_DIMENSION_RE = r'(?P<res_dim>[0-9]|[0-9]+ x [0-9]|[0-9]+?([a-z-A-Z0-9\.:\s]+))(\s+)' \
         r'(?P<mm>[a-z-A-Z0-9\.]+ mm x [a-z-A-Z0-9\.]+ mm) ' \
-        r'(?P<inches>\([a-z-A-Z0-9\.]+ in x [a-z-A-Z0-9\.]+ in\))?'
+        r'(?P<inches>\([a-z-A-Z0-9\.]+ in x [a-z-A-Z0-9\.]+ in(\)))?'
 sensor_dimension_regex = re.compile(SENSOR_DIMENSION_RE)
 
-# To filter other manufacturers, please update list to get them
-"""_ALLOWED_CAM_MANUFACTURERS = ['Red']"""
-
+# To filter other manufacturers, please update the list below for additional query
 _ALLOWED_CAM_MANUFACTURERS = ['Arri', 'Blackmagic', 'Canon', 'Panasonic',
                               'Panavision', 'Sony', 'Red', 'Vision Research']
 
@@ -90,10 +86,18 @@ for cam_manufacturer in _ALLOWED_CAM_MANUFACTURERS:
                 sensor_dimension_data = OrderedDict()
                 dimension = match.get('res_dim')
                 aperture_mm = match.get('mm')
-                aperture_inches = match.get('inches')
                 sensor_dimension_data['Aperture (mm)'] = aperture_mm
-                sensor_dimension_data['Aperture (Inches)'] = aperture_inches
-                sensor_dimension_data['Sensor Area Pitch'] = '{0} {1}'.format(aperture_mm, aperture_inches)
+                aperture_inches = match.get('inches')
+                if aperture_inches:
+                    # Some text input contains errors without enclosing parenthesis
+                    if not aperture_inches.endswith(')'):
+                        aperture_inches = aperture_inches + ')'
+                    sensor_dimension_data['Aperture (Inches)'] = aperture_inches
+                    sensor_dimension_data['Sensor Area Pitch'] = '{0} {1}'.format(aperture_mm,
+                                                                                  aperture_inches)
+                else:
+                    sensor_dimension_data['Sensor Area Pitch'] = aperture_mm
+                camera_data[cam_manufacturer][camera_type] = resolution_data
                 resolution_data['Resolutions'][dimension] = sensor_dimension_data
 
             camera_data[cam_manufacturer][camera_type] = resolution_data
@@ -116,10 +120,16 @@ for cam_manufacturer in _ALLOWED_CAM_MANUFACTURERS:
                 resolution_data = OrderedDict()
                 match_dict = match.groupdict()
                 aperture_mm = match_dict.get('mm')
-                aperture_inches = match_dict.get('inches')
                 resolution_data['Aperture (mm)'] = aperture_mm
-                resolution_data['Aperture (Inches)'] = aperture_inches
-                resolution_data['Sensor Area Pitch'] = '{0} {1}'.format(aperture_mm, aperture_inches)
+                aperture_inches = match_dict.get('inches')
+                if aperture_inches:
+                    # Some text input contains errors without enclosing parenthesis
+                    if not aperture_inches.endswith(')'):
+                        aperture_inches = aperture_inches + ')'
+                    resolution_data['Aperture (Inches)'] = aperture_inches
+                    resolution_data['Sensor Area Pitch'] = '{0} {1}'.format(aperture_mm, aperture_inches)
+                else:
+                    resolution_data['Sensor Area Pitch'] = aperture_mm
                 camera_data[cam_manufacturer][camera_type] = resolution_data
             else:
                 resolution_data = OrderedDict({'Sensors': OrderedDict()})
@@ -144,6 +154,9 @@ for cam_manufacturer in _ALLOWED_CAM_MANUFACTURERS:
                             sensor_dimension_data['Aperture (mm)'] = aperture_mm
                             aperture_inches = match.get('inches')
                             if aperture_inches:
+                                # Some text input contains errors without enclosing parenthesis
+                                if not aperture_inches.endswith(')'):
+                                    aperture_inches = aperture_inches + ')'
                                 sensor_dimension_data['Aperture (Inches)'] = aperture_inches
                                 sensor_dimension_data['Sensor Area Pitch'] = '{0} {1}'.format(aperture_mm,
                                                                                               aperture_inches)
